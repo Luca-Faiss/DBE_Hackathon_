@@ -1,6 +1,7 @@
 #include <SPI.h>
 #include <MFRC522.h>
 #include <WiFiNINA_Generic.h>
+#include "NodeRedWebhook.h"
 
 // ----- WIFI -------
 char ssid[] = "Lab@SmartLab_2G";
@@ -22,6 +23,14 @@ MFRC522::MIFARE_Key key;
 byte nuidPICC[4];
 unsigned long lastReadTS;
 
+// ------- IFTT -------
+char YOUR_IFTTT_API_KEY[] = "ba8Pa_lMmzkmMi5YC0PAiM";
+char YOUR_IFTTT_EVENT_NAME[] = "zoom";
+
+// -------- Node-Red ----
+char URL[] = "elwa.eu.ngrok.io";
+char ENDPOINT[] = "event";
+
 void connectToWifi() {
   // set the LED as output
   pinMode(LED_BUILTIN, OUTPUT);
@@ -34,7 +43,7 @@ void connectToWifi() {
     status = WiFi.begin(ssid, pass);
 
     // wait 10 seconds for connection:
-    delay(10000);
+    delay(3000);
   }
 
   // you're connected now, so print out the data:
@@ -123,10 +132,7 @@ void readRFID() {
     return;
   }
 
-  unsigned long test = millis() - lastReadTS;
-  Serial.println("Milis ");
-  Serial.println(test);
-
+ 
   if (rfid.uid.uidByte[0] != nuidPICC[0] || 
     rfid.uid.uidByte[1] != nuidPICC[1] || 
     rfid.uid.uidByte[2] != nuidPICC[2] || 
@@ -135,11 +141,15 @@ void readRFID() {
     ) {
     Serial.println(F("A new card has been detected."));
 
+   String hexstring;
+
     // Store NUID into nuidPICC array
     for (byte i = 0; i < 4; i++) {
       nuidPICC[i] = rfid.uid.uidByte[i];
+      hexstring += String(rfid.uid.uidByte[i], HEX);
     }
-   
+
+    Serial.println(hexstring);
     Serial.println(F("The NUID tag is:"));
     Serial.print(F("In hex: "));
     printHex(rfid.uid.uidByte, rfid.uid.size);
@@ -147,6 +157,10 @@ void readRFID() {
     Serial.print(F("In dec: "));
     printDec(rfid.uid.uidByte, rfid.uid.size);
     Serial.println();
+
+
+    char *hexchars = strdup(hexstring.c_str());
+    send_webhook(URL, ENDPOINT, hexchars);
   }
   else Serial.println(F("Card read previously."));
 
@@ -184,6 +198,8 @@ void printHex(byte *buffer, byte bufferSize) {
     Serial.print(buffer[i], HEX);
   }
 }
+
+
 
 /**
  * Helper routine to dump a byte array as dec values to Serial.
